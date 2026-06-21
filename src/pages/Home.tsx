@@ -1,16 +1,79 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from '../components/Header';
 import RouteOverview from '../components/RouteOverview';
 import AbnormalStudents from '../components/AbnormalStudents';
 import ShiftArchive from '../components/ShiftArchive';
+import AlertSummary from '../components/AlertSummary';
 import { initialRoutes, initialStudents, initialShifts, dutyOfficer } from '../data/mockData';
-import type { Route, Student, Shift } from '../types';
+import type { Route, Student, Shift, AlertItem } from '../types';
 
 export default function Home() {
   const [routes, setRoutes] = useState<Route[]>(initialRoutes);
   const [students, setStudents] = useState<Student[]>(initialStudents);
   const [shifts, setShifts] = useState<Shift[]>(initialShifts);
   const [updateCount, setUpdateCount] = useState(0);
+
+  const alerts = useMemo<AlertItem[]>(() => {
+    const result: AlertItem[] = [];
+    const statusLabels = { normal: '正常', delayed: '延迟', abnormal: '异常' };
+    const abnormalTypeLabels = { absent: '未到', wrong_station: '错站', parent_pickup: '家长接走' };
+
+    routes.forEach((route) => {
+      if (route.status === 'abnormal') {
+        result.push({
+          id: `route-${route.id}`,
+          type: 'route',
+          priority: 1,
+          title: route.name,
+          subtitle: `${route.driver} / ${route.caretaker}`,
+          status: statusLabels[route.status],
+          statusColor: 'text-red-400',
+          contactName: route.caretaker,
+          contactPhone: route.caretakerPhone,
+          routeId: route.id,
+          reportTime: route.lastUpdate,
+        });
+      } else if (route.status === 'delayed') {
+        result.push({
+          id: `route-${route.id}`,
+          type: 'route',
+          priority: 2,
+          title: route.name,
+          subtitle: `${route.driver} / ${route.caretaker}`,
+          status: statusLabels[route.status],
+          statusColor: 'text-orange-400',
+          contactName: route.caretaker,
+          contactPhone: route.caretakerPhone,
+          routeId: route.id,
+          reportTime: route.lastUpdate,
+        });
+      }
+    });
+
+    students.forEach((student) => {
+      if (student.followUpStatus !== 'confirmed') {
+        result.push({
+          id: `student-${student.id}`,
+          type: 'student',
+          priority: student.priority,
+          title: student.name,
+          subtitle: `${student.className} · ${student.station}`,
+          status: abnormalTypeLabels[student.abnormalType],
+          statusColor: student.priority === 1 ? 'text-red-400' : 'text-orange-400',
+          contactName: student.contactPerson,
+          contactPhone: student.contactPhone,
+          routeId: student.routeId,
+          studentId: student.id,
+          reportTime: student.reportTime,
+        });
+      }
+    });
+
+    return result.sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return b.reportTime.localeCompare(a.reportTime);
+    });
+  }, [routes, students]);
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('zh-CN', { hour12: false });
@@ -57,17 +120,28 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [simulateDataUpdate]);
 
-  const handleResolveStudent = (studentId: string) => {
-    setTimeout(() => {
-      setStudents((prev) => prev.filter((s) => s.id !== studentId));
-    }, 500);
+  const handleUpdateStudentStatus = (studentId: string, status: 'contacted' | 'waiting' | 'confirmed', note: string) => {
+    setStudents((prev) =>
+      prev.map((s) =>
+        s.id === studentId
+          ? {
+              ...s,
+              followUpStatus: status,
+              followUpNote: note,
+              followUpTime: formatTime(new Date()),
+              isNew: false,
+            }
+          : s
+      )
+    );
   };
 
   const stats = {
     totalRoutes: routes.length,
     runningRoutes: routes.filter((r) => r.unconfirmedCount > 0).length,
     completedRoutes: routes.filter((r) => r.unconfirmedCount === 0).length,
-    abnormalCount: students.filter((s) => !s.isNew || s.isNew).length,
+    abnormalCount: students.filter((s) => s.followUpStatus !== 'confirmed').length,
+    urgentCount: students.filter((s) => s.priority === 1 && s.followUpStatus !== 'confirmed').length,
     dutyOfficer: dutyOfficer,
   };
 
@@ -76,13 +150,19 @@ export default function Home() {
       <Header stats={stats} />
 
       <main className="p-6">
+        {alerts.length > 0 && (
+          <div className="mb-6">
+            <AlertSummary alerts={alerts} />
+          </div>
+        )}
+
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-2">
             <RouteOverview routes={routes} />
           </div>
 
           <div className="space-y-6">
-            <AbnormalStudents students={students} onResolve={handleResolveStudent} />
+            <AbnormalStudents students={students} onUpdateStatus={handleUpdateStudentStatus} />
             <ShiftArchive shifts={shifts} />
           </div>
         </div>

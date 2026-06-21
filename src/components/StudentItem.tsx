@@ -8,22 +8,24 @@ import {
   MapPin,
   Clock,
   MessageSquare,
-  XCircle,
-  X,
   CheckCircle2,
+  History,
 } from 'lucide-react';
-import type { Student } from '../types';
-import { abnormalTypeLabels } from '../data/mockData';
+import type { Student, FollowUpStatus } from '../types';
+import {
+  abnormalTypeLabels,
+} from '../data/mockData';
+import { followUpStatusLabels, followUpStatusColors } from '../types';
 
 interface StudentItemProps {
   student: Student;
   index: number;
-  onResolve: (id: string) => void;
+  onUpdateStatus: (id: string, status: FollowUpStatus, note: string) => void;
 }
 
-export default function StudentItem({ student, index, onResolve }: StudentItemProps) {
+export default function StudentItem({ student, index, onUpdateStatus }: StudentItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isResolved, setIsResolved] = useState(false);
+  const [followUpNote, setFollowUpNote] = useState('');
 
   const typeColors = {
     absent: {
@@ -48,31 +50,31 @@ export default function StudentItem({ student, index, onResolve }: StudentItemPr
 
   const colors = typeColors[student.abnormalType];
   const isUrgent = student.priority === 1;
+  const isConfirmed = student.followUpStatus === 'confirmed';
 
-  const handleResolve = () => {
-    setIsResolved(true);
-    onResolve(student.id);
+  const nextStatusOptions: { status: FollowUpStatus; label: string; color: string }[] = [
+    { status: 'contacted', label: '已联系家长', color: 'bg-blue-600 hover:bg-blue-500' },
+    { status: 'waiting', label: '等待回复', color: 'bg-orange-600 hover:bg-orange-500' },
+    { status: 'confirmed', label: '已确认安全', color: 'bg-green-600 hover:bg-green-500' },
+  ];
+
+  const handleStatusChange = (status: FollowUpStatus) => {
+    const now = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    onUpdateStatus(student.id, status, followUpNote || followUpStatusLabels[status]);
+    setFollowUpNote('');
   };
 
-  if (isResolved) {
-    return (
-      <div
-        className="bg-green-500/5 border border-green-500/20 rounded-xl p-4 opacity-60"
-        style={{ animationDelay: `${index * 0.1}s` }}
-      >
-        <div className="flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-green-400" />
-          <span className="text-slate-400 line-through">{student.name}</span>
-          <span className="text-xs text-green-400 ml-auto">已处理</span>
-        </div>
-      </div>
-    );
-  }
+  const handleCall = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    window.location.href = `tel:${student.contactPhone.replace(/-/g, '')}`;
+  };
 
   return (
     <div
       className={`${colors.bg} border ${colors.border} rounded-xl overflow-hidden
-                  ${student.isNew ? 'animate-glow' : ''} transition-all duration-300`}
+                  ${student.isNew ? 'animate-glow' : ''} 
+                  ${isConfirmed ? 'opacity-70' : ''}
+                  transition-all duration-300`}
       style={{ animationDelay: `${index * 0.1}s` }}
     >
       <div
@@ -80,15 +82,23 @@ export default function StudentItem({ student, index, onResolve }: StudentItemPr
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-3">
-          {isUrgent && (
+          {isUrgent && !isConfirmed && (
             <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 animate-pulse" />
+          )}
+          {isConfirmed && (
+            <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
           )}
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-semibold text-white truncate">{student.name}</span>
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className={`font-semibold ${isConfirmed ? 'text-slate-400 line-through' : 'text-white'} truncate`}>
+                {student.name}
+              </span>
               <span className={`text-xs px-2 py-0.5 rounded ${colors.badge} text-white`}>
                 {abnormalTypeLabels[student.abnormalType]}
+              </span>
+              <span className={`text-xs px-2 py-0.5 rounded border ${followUpStatusColors[student.followUpStatus]}`}>
+                {followUpStatusLabels[student.followUpStatus]}
               </span>
               {student.isNew && (
                 <span className="text-xs px-2 py-0.5 rounded bg-red-600 text-white new-badge">
@@ -96,7 +106,7 @@ export default function StudentItem({ student, index, onResolve }: StudentItemPr
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3 text-xs text-slate-400">
+            <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
               <span className="flex items-center gap-1">
                 <User className="w-3 h-3" />
                 {student.className}
@@ -109,6 +119,12 @@ export default function StudentItem({ student, index, onResolve }: StudentItemPr
                 <Clock className="w-3 h-3" />
                 {student.reportTime}
               </span>
+              {student.followUpTime && (
+                <span className="flex items-center gap-1 text-blue-400">
+                  <History className="w-3 h-3" />
+                  {student.followUpTime}
+                </span>
+              )}
             </div>
           </div>
 
@@ -122,7 +138,7 @@ export default function StudentItem({ student, index, onResolve }: StudentItemPr
 
       {isExpanded && (
         <div className="px-4 pb-4 border-t border-slate-700/50 pt-4 animate-fade-in">
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-start gap-2">
               <MessageSquare className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" />
               <div>
@@ -140,36 +156,63 @@ export default function StudentItem({ student, index, onResolve }: StudentItemPr
               </div>
             </div>
 
-            <div className="flex gap-2 pt-2">
-              <button
-                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-              >
-                <Phone className="w-4 h-4" />
-                一键拨打
-              </button>
-              <button
-                className="bg-green-600/20 hover:bg-green-600/30 text-green-400 text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 border border-green-600/30"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleResolve();
-                }}
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                标记已处理
-              </button>
-              <button
-                className="bg-slate-700/50 hover:bg-slate-700 text-slate-400 text-sm font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center"
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-                title="忽略"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+            {student.followUpNote && (
+              <div className="flex items-start gap-2">
+                <History className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-slate-500 mb-1">跟进记录</div>
+                  <div className="text-sm text-slate-300">{student.followUpNote}</div>
+                </div>
+              </div>
+            )}
+
+            {!isConfirmed && (
+              <>
+                <div>
+                  <div className="text-xs text-slate-500 mb-2">跟进备注（可选）</div>
+                  <input
+                    type="text"
+                    className="w-full bg-dark-900/50 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                    placeholder="输入跟进说明..."
+                    value={followUpNote}
+                    onChange={(e) => setFollowUpNote(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <button
+                    className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 border border-blue-600/30"
+                    onClick={handleCall}
+                  >
+                    <Phone className="w-4 h-4" />
+                    一键拨打
+                  </button>
+                  {nextStatusOptions.map((opt) => (
+                    <button
+                      key={opt.status}
+                      className={`${opt.color} text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleStatusChange(opt.status);
+                      }}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {isConfirmed && (
+              <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                <div className="flex items-center gap-2 text-green-400">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span className="text-sm font-medium">已确认安全，处理完成</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

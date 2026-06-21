@@ -1,4 +1,4 @@
-import type { Route, Student, Shift } from '../types';
+import type { Route, Student, Shift, StudentDetail } from '../types';
 
 export const initialRoutes: Route[] = [
   {
@@ -13,6 +13,8 @@ export const initialRoutes: Route[] = [
     status: 'normal',
     lastUpdate: '07:15:23',
     currentLocation: '人民路站',
+    caretakerPhone: '138-1111-0001',
+    driverPhone: '139-1111-0001',
   },
   {
     id: 'r2',
@@ -26,6 +28,8 @@ export const initialRoutes: Route[] = [
     status: 'normal',
     lastUpdate: '07:14:56',
     currentLocation: '科技路站',
+    caretakerPhone: '138-1111-0002',
+    driverPhone: '139-1111-0002',
   },
   {
     id: 'r3',
@@ -39,6 +43,8 @@ export const initialRoutes: Route[] = [
     status: 'delayed',
     lastUpdate: '07:12:45',
     currentLocation: '花园路站',
+    caretakerPhone: '138-1111-0003',
+    driverPhone: '139-1111-0003',
   },
   {
     id: 'r4',
@@ -52,6 +58,8 @@ export const initialRoutes: Route[] = [
     status: 'abnormal',
     lastUpdate: '07:10:12',
     currentLocation: '长江路站',
+    caretakerPhone: '138-1111-0004',
+    driverPhone: '139-1111-0004',
   },
   {
     id: 'r5',
@@ -65,6 +73,8 @@ export const initialRoutes: Route[] = [
     status: 'normal',
     lastUpdate: '07:16:01',
     currentLocation: '中山站',
+    caretakerPhone: '138-1111-0005',
+    driverPhone: '139-1111-0005',
   },
   {
     id: 'r6',
@@ -78,6 +88,8 @@ export const initialRoutes: Route[] = [
     status: 'normal',
     lastUpdate: '07:13:30',
     currentLocation: '环城路站',
+    caretakerPhone: '138-1111-0006',
+    driverPhone: '139-1111-0006',
   },
   {
     id: 'r7',
@@ -91,6 +103,8 @@ export const initialRoutes: Route[] = [
     status: 'delayed',
     lastUpdate: '07:11:20',
     currentLocation: '高速入口站',
+    caretakerPhone: '138-1111-0007',
+    driverPhone: '139-1111-0007',
   },
   {
     id: 'r8',
@@ -104,6 +118,8 @@ export const initialRoutes: Route[] = [
     status: 'normal',
     lastUpdate: '07:15:45',
     currentLocation: '开发区站',
+    caretakerPhone: '138-1111-0008',
+    driverPhone: '139-1111-0008',
   },
 ];
 
@@ -121,6 +137,10 @@ export const initialStudents: Student[] = [
     priority: 1,
     reportTime: '07:05:30',
     isNew: false,
+    followUpStatus: 'pending',
+    followUpNote: '',
+    followUpTime: '',
+    status: 'abnormal',
   },
   {
     id: 's2',
@@ -135,6 +155,10 @@ export const initialStudents: Student[] = [
     priority: 1,
     reportTime: '07:08:15',
     isNew: false,
+    followUpStatus: 'contacted',
+    followUpNote: '已联系母亲，正在前往正确站点',
+    followUpTime: '07:09:00',
+    status: 'abnormal',
   },
   {
     id: 's3',
@@ -149,6 +173,10 @@ export const initialStudents: Student[] = [
     priority: 2,
     reportTime: '07:02:45',
     isNew: false,
+    followUpStatus: 'confirmed',
+    followUpNote: '家长确认已安全送达学校',
+    followUpTime: '07:20:00',
+    status: 'abnormal',
   },
   {
     id: 's4',
@@ -163,6 +191,10 @@ export const initialStudents: Student[] = [
     priority: 1,
     reportTime: '07:09:00',
     isNew: true,
+    followUpStatus: 'pending',
+    followUpNote: '',
+    followUpTime: '',
+    status: 'abnormal',
   },
   {
     id: 's5',
@@ -177,6 +209,10 @@ export const initialStudents: Student[] = [
     priority: 2,
     reportTime: '07:10:30',
     isNew: false,
+    followUpStatus: 'waiting',
+    followUpNote: '已联系母亲，等待回复中',
+    followUpTime: '07:12:00',
+    status: 'abnormal',
   },
   {
     id: 's6',
@@ -191,6 +227,10 @@ export const initialStudents: Student[] = [
     priority: 2,
     reportTime: '06:55:00',
     isNew: false,
+    followUpStatus: 'confirmed',
+    followUpNote: '家长微信确认已到校',
+    followUpTime: '07:30:00',
+    status: 'abnormal',
   },
 ];
 
@@ -208,9 +248,110 @@ export const initialShifts: Shift[] = [
     studentCount: 40,
     abnormalCount: 1,
     completedTime: '07:45:30',
+    alightingCheckTime: '07:42:00',
+    cabinCheckTime: '07:45:00',
   },
   {
     id: 'sh2',
+    date: '2026-06-22',
+    shiftType: 'morning',
+    routeId: 'r1',
+    routeName: '东线1号',
+    driver: '张建国',
+    caretaker: '李老师',
+    alightingCheck: true,
+    cabinCheck: false,
+    studentCount: 45,
+    abnormalCount: 1,
+    completedTime: '07:50:00',
+    alightingCheckTime: '07:48:00',
+  },
+  {
+    id: 'sh3',
+    date: '2026-06-22',
+    shiftType: 'morning',
+    routeId: 'r2',
+    routeName: '西线2号',
+    driver: '王志强',
+    caretaker: '赵老师',
+    alightingCheck: false,
+    cabinCheck: false,
+    studentCount: 38,
+    abnormalCount: 0,
+    completedTime: '',
+  },
+  {
+    id: 'sh4',
+    date: '2026-06-22',
+    shiftType: 'morning',
+    routeId: 'r3',
+    routeName: '南线3号',
+    driver: '刘德海',
+    caretaker: '王老师',
+    alightingCheck: false,
+    cabinCheck: false,
+    studentCount: 42,
+    abnormalCount: 1,
+    completedTime: '',
+  },
+  {
+    id: 'sh5',
+    date: '2026-06-22',
+    shiftType: 'morning',
+    routeId: 'r4',
+    routeName: '北线4号',
+    driver: '陈明华',
+    caretaker: '刘老师',
+    alightingCheck: false,
+    cabinCheck: false,
+    studentCount: 35,
+    abnormalCount: 2,
+    completedTime: '',
+  },
+  {
+    id: 'sh6',
+    date: '2026-06-22',
+    shiftType: 'morning',
+    routeId: 'r6',
+    routeName: '环线6号',
+    driver: '吴建军',
+    caretaker: '周老师',
+    alightingCheck: false,
+    cabinCheck: false,
+    studentCount: 33,
+    abnormalCount: 1,
+    completedTime: '',
+  },
+  {
+    id: 'sh7',
+    date: '2026-06-22',
+    shiftType: 'morning',
+    routeId: 'r7',
+    routeName: '快线7号',
+    driver: '郑晓峰',
+    caretaker: '吴老师',
+    alightingCheck: false,
+    cabinCheck: false,
+    studentCount: 28,
+    abnormalCount: 0,
+    completedTime: '',
+  },
+  {
+    id: 'sh8',
+    date: '2026-06-22',
+    shiftType: 'morning',
+    routeId: 'r8',
+    routeName: '专线8号',
+    driver: '孙志刚',
+    caretaker: '郑老师',
+    alightingCheck: false,
+    cabinCheck: false,
+    studentCount: 25,
+    abnormalCount: 0,
+    completedTime: '',
+  },
+  {
+    id: 'sh9',
     date: '2026-06-21',
     shiftType: 'afternoon',
     routeId: 'r1',
@@ -222,9 +363,11 @@ export const initialShifts: Shift[] = [
     studentCount: 44,
     abnormalCount: 2,
     completedTime: '16:50:15',
+    alightingCheckTime: '16:48:00',
+    cabinCheckTime: '16:50:00',
   },
   {
-    id: 'sh3',
+    id: 'sh10',
     date: '2026-06-21',
     shiftType: 'morning',
     routeId: 'r2',
@@ -236,8 +379,41 @@ export const initialShifts: Shift[] = [
     studentCount: 37,
     abnormalCount: 0,
     completedTime: '07:48:20',
+    alightingCheckTime: '07:46:00',
   },
 ];
+
+export const routeStudentDetails: Record<string, StudentDetail[]> = {
+  r1: [
+    { id: 'r1s1', name: '王小明', className: '三年级(2)班', station: '人民路站', status: 'abnormal', abnormalType: 'absent', abnormalNote: '连续两天未到', contactPerson: '父亲 王建国', contactPhone: '138-0012-3456' },
+    { id: 'r1s2', name: '李明华', className: '三年级(1)班', station: '人民路站', status: 'boarded', boardedTime: '07:05:00' },
+    { id: 'r1s3', name: '张华峰', className: '四年级(2)班', station: '人民路站', status: 'boarded', boardedTime: '07:05:02' },
+    { id: 'r1s4', name: '刘思琪', className: '二年级(3)班', station: '东风路站', status: 'boarded', boardedTime: '07:08:15' },
+    { id: 'r1s5', name: '陈雨萱', className: '三年级(2)班', station: '东风路站', status: 'boarded', boardedTime: '07:08:20' },
+    { id: 'r1s6', name: '赵宇航', className: '五年级(1)班', station: '东风路站', status: 'boarded', boardedTime: '07:08:25' },
+    { id: 'r1s7', name: '孙嘉怡', className: '四年级(1)班', station: '解放路站', status: 'boarded', boardedTime: '07:12:30' },
+    { id: 'r1s8', name: '周子轩', className: '三年级(3)班', station: '解放路站', status: 'unconfirmed' },
+    { id: 'r1s9', name: '吴佳怡', className: '二年级(1)班', station: '解放路站', status: 'unconfirmed' },
+    { id: 'r1s10', name: '郑浩然', className: '五年级(2)班', station: '学院路站', status: 'boarded', boardedTime: '07:15:00' },
+    { id: 'r1s11', name: '王梓涵', className: '四年级(3)班', station: '学院路站', status: 'unconfirmed' },
+    { id: 'r1s12', name: '李诗涵', className: '三年级(1)班', station: '学院路站', status: 'unconfirmed' },
+    { id: 'r1s13', name: '张梓轩', className: '二年级(2)班', station: '终点站', status: 'unconfirmed' },
+    { id: 'r1s14', name: '刘梦瑶', className: '一年级(1)班', station: '终点站', status: 'unconfirmed' },
+    { id: 'r1s15', name: '陈俊杰', className: '五年级(3)班', station: '终点站', status: 'unconfirmed' },
+  ],
+  r4: [
+    { id: 'r4s1', name: '李小红', className: '五年级(1)班', station: '科技路站', status: 'abnormal', abnormalType: 'wrong_station', abnormalNote: '在错误站点等车', contactPerson: '母亲 李美玲', contactPhone: '139-0023-4567' },
+    { id: 'r4s2', name: '刘芳', className: '二年级(1)班', station: '长江路站', status: 'abnormal', abnormalType: 'absent', abnormalNote: '今早未到，电话关机', contactPerson: '父亲 刘卫东', contactPhone: '136-0045-6789' },
+    { id: 'r4s3', name: '王磊', className: '四年级(2)班', station: '长江路站', status: 'boarded', boardedTime: '07:08:00' },
+    { id: 'r4s4', name: '李娜', className: '三年级(1)班', station: '长江路站', status: 'boarded', boardedTime: '07:08:05' },
+    { id: 'r4s5', name: '张伟', className: '五年级(2)班', station: '黄河路站', status: 'boarded', boardedTime: '07:12:15' },
+    { id: 'r4s6', name: '刘阳', className: '四年级(1)班', station: '黄河路站', status: 'boarded', boardedTime: '07:12:20' },
+    { id: 'r4s7', name: '陈静', className: '三年级(3)班', station: '黄河路站', status: 'boarded', boardedTime: '07:12:25' },
+    { id: 'r4s8', name: '赵强', className: '二年级(2)班', station: '珠江路站', status: 'unconfirmed' },
+    { id: 'r4s9', name: '孙丽', className: '一年级(2)班', station: '珠江路站', status: 'unconfirmed' },
+    { id: 'r4s10', name: '周杰', className: '六年级(1)班', station: '珠江路站', status: 'boarded', boardedTime: '07:15:30' },
+  ],
+};
 
 export const dutyOfficer = '王主任（值班校领导）';
 
@@ -256,4 +432,12 @@ export const statusLabels: Record<string, string> = {
 export const shiftTypeLabels: Record<string, string> = {
   morning: '早班',
   afternoon: '晚班',
+};
+
+export const getTodayDateString = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };

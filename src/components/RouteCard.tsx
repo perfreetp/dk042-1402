@@ -1,4 +1,5 @@
-import { User, MapPin, Clock, Users } from 'lucide-react';
+import { User, MapPin, Clock, Users, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import type { Route } from '../types';
 import { statusLabels } from '../data/mockData';
 
@@ -8,6 +9,8 @@ interface RouteCardProps {
 }
 
 export default function RouteCard({ route, index }: RouteCardProps) {
+  const navigate = useNavigate();
+
   const statusColors = {
     normal: {
       bg: 'bg-green-500/10',
@@ -34,8 +37,9 @@ export default function RouteCard({ route, index }: RouteCardProps) {
 
   return (
     <div
+      onClick={() => navigate(`/route/${route.id}`)}
       className={`bg-dark-800/60 backdrop-blur-sm rounded-xl ${colors.border} ${colors.bg} 
-                  card-hover animate-slide-up overflow-hidden`}
+                  card-hover animate-slide-up overflow-hidden cursor-pointer group`}
       style={{ animationDelay: `${index * 0.08}s` }}
     >
       <div className="p-5">
@@ -47,6 +51,7 @@ export default function RouteCard({ route, index }: RouteCardProps) {
               <span className="text-xs text-slate-500 font-mono bg-slate-700/50 px-2 py-0.5 rounded">
                 {route.routeNumber}
               </span>
+              <ChevronRight className="w-4 h-4 text-slate-500 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
             </div>
             <span className={`text-sm font-medium ${colors.text}`}>
               {statusLabels[route.status]}

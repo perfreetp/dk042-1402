@@ -218,17 +218,18 @@ export default function ShiftArchive() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                      {shift.abnormalCount > 0 && (
-                        <span className="flex items-center gap-1 text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">
-                          <AlertTriangle className="w-3 h-3" />
-                          异常 {shift.abnormalCount}
-                        </span>
-                      )}
-                      {shift.completedTime && (
-                        <span className="text-xs text-slate-500 font-mono">
-                          {shift.completedTime}
-                        </span>
-                      )}
+                      <span className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${
+                        shift.abnormalCount > 0 
+                          ? 'text-red-400 bg-red-500/10 border border-red-500/30' 
+                          : 'text-slate-400 bg-slate-700/30'
+                      }`}>
+                        <AlertTriangle className="w-3 h-3" />
+                        异常 {shift.abnormalCount || 0}
+                      </span>
+                      <span className="text-xs text-slate-500 font-mono flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {shift.completedTime || '未完成'}
+                      </span>
                       {isExpanded ? (
                         <ChevronUp className="w-4 h-4 text-slate-500" />
                       ) : (

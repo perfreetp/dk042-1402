@@ -1,5 +1,14 @@
 import { create } from 'zustand';
-import type { Route, Student, Shift, AlertItem, StudentDetail, FollowUpStatus } from '../types';
+import type {
+  Route,
+  Student,
+  Shift,
+  AlertItem,
+  StudentDetail,
+  FollowUpStatus,
+  DisposalAction,
+  ActionType,
+} from '../types';
 import {
   initialRoutes,
   initialStudents,
@@ -16,12 +25,17 @@ interface DashboardState {
   students: Student[];
   shifts: Shift[];
   routeStudentDetails: Record<string, StudentDetail[]>;
+  disposalActions: DisposalAction[];
   currentOperator: string;
   currentOperatorRole: 'duty_officer' | 'caretaker' | 'teacher';
+  highlightedStudentId: string | null;
+  highlightedShiftId: string | null;
 
   setRoutes: (routes: Route[]) => void;
   setStudents: (students: Student[]) => void;
   setShifts: (shifts: Shift[]) => void;
+  setHighlightedStudentId: (id: string | null) => void;
+  setHighlightedShiftId: (id: string | null) => void;
 
   updateRouteStatus: (routeId: string, updates: Partial<Route>) => void;
 
@@ -31,13 +45,61 @@ interface DashboardState {
     note: string
   ) => void;
 
+  addDisposalAction: (
+    type: ActionType,
+    routeId: string,
+    title: string,
+    description: string,
+    options?: { studentId?: string; studentName?: string; priority?: 1 | 2 }
+  ) => void;
+
   getRouteById: (routeId: string) => Route | undefined;
   getStudentsByRoute: (routeId: string) => Student[];
   getTodayMorningShifts: () => Shift[];
   getAlerts: () => AlertItem[];
   getStudentDetailsByRoute: (routeId: string) => StudentDetail[];
+  getDisposalActionsByRoute: (routeId: string) => DisposalAction[];
+  getAllDisposalActions: () => DisposalAction[];
 
   simulateDataUpdate: () => void;
+}
+
+function generateInitialDisposalActions(
+  routes: Route[],
+  students: Student[]
+): DisposalAction[] {
+  const actions: DisposalAction[] = [];
+  const now = new Date();
+
+  students.forEach((student) => {
+    const route = routes.find((r) => r.id === student.routeId);
+    if (!route) return;
+
+    student.followUpRecords.forEach((record, idx) => {
+      let actionType: ActionType;
+      if (record.status === 'contacted') actionType = 'contact_parent';
+      else if (record.status === 'waiting') actionType = 'waiting_reply';
+      else if (record.status === 'confirmed') actionType = 'confirm_safety';
+      else return;
+
+      actions.push({
+        id: `action-${student.id}-${idx}`,
+        routeId: student.routeId,
+        routeName: route.name,
+        type: actionType,
+        title: `${student.name} - ${record.status === 'confirmed' ? '已确认安全' : record.status === 'contacted' ? '已联系家长' : '等待回复'}`,
+        description: record.note,
+        operator: record.operator,
+        operatorRole: record.operatorRole,
+        time: record.time,
+        studentId: student.id,
+        studentName: student.name,
+        priority: student.priority,
+      });
+    });
+  });
+
+  return actions.sort((a, b) => b.time.localeCompare(a.time));
 }
 
 export const useDashboardStore = create<DashboardState>((set, get) => ({
@@ -45,12 +107,17 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   students: initialStudents,
   shifts: initialShifts,
   routeStudentDetails: routeStudentDetails,
+  disposalActions: generateInitialDisposalActions(initialRoutes, initialStudents),
   currentOperator: dutyOfficer,
   currentOperatorRole: 'duty_officer',
+  highlightedStudentId: null,
+  highlightedShiftId: null,
 
   setRoutes: (routes) => set({ routes }),
   setStudents: (students) => set({ students }),
   setShifts: (shifts) => set({ shifts }),
+  setHighlightedStudentId: (id) => set({ highlightedStudentId: id }),
+  setHighlightedShiftId: (id) => set({ highlightedShiftId: id }),
 
   updateRouteStatus: (routeId, updates) =>
     set((state) => ({
@@ -62,7 +129,34 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   updateStudentFollowUp: (studentId, status, note) =>
     set((state) => {
       const now = new Date().toLocaleTimeString('zh-CN', { hour12: false });
-      const { currentOperator, currentOperatorRole } = state;
+      const { currentOperator, currentOperatorRole, routes, disposalActions } = state;
+      const student = state.students.find((s) => s.id === studentId);
+      if (!student) return state;
+
+      const route = routes.find((r) => r.id === student.routeId);
+
+      let actionType: ActionType | null = null;
+      if (status === 'contacted') actionType = 'contact_parent';
+      else if (status === 'waiting') actionType = 'waiting_reply';
+      else if (status === 'confirmed') actionType = 'confirm_safety';
+
+      const newActions = [...disposalActions];
+      if (actionType && route) {
+        newActions.unshift({
+          id: `action-${Date.now()}`,
+          routeId: student.routeId,
+          routeName: route.name,
+          type: actionType,
+          title: `${student.name} - ${status === 'confirmed' ? '已确认安全' : status === 'contacted' ? '已联系家长' : '等待回复'}`,
+          description: note,
+          operator: currentOperator,
+          operatorRole: currentOperatorRole,
+          time: now,
+          studentId: student.id,
+          studentName: student.name,
+          priority: student.priority,
+        });
+      }
 
       return {
         students: state.students.map((s) =>
@@ -87,6 +181,34 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
               }
             : s
         ),
+        disposalActions: newActions,
+      };
+    }),
+
+  addDisposalAction: (type, routeId, title, description, options) =>
+    set((state) => {
+      const now = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      const route = state.routes.find((r) => r.id === routeId);
+      if (!route) return state;
+
+      return {
+        disposalActions: [
+          {
+            id: `action-${Date.now()}`,
+            routeId,
+            routeName: route.name,
+            type,
+            title,
+            description,
+            operator: state.currentOperator,
+            operatorRole: state.currentOperatorRole,
+            time: now,
+            studentId: options?.studentId,
+            studentName: options?.studentName,
+            priority: options?.priority || 2,
+          },
+          ...state.disposalActions,
+        ],
       };
     }),
 
@@ -101,7 +223,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   getTodayMorningShifts: () => {
-    const { shifts, routes } = get();
+    const { shifts, routes, students } = get();
     const today = getTodayDateString();
 
     const existingShifts = shifts.filter(
@@ -111,22 +233,35 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
     const missingShifts: Shift[] = routes
       .filter((r) => !existingRouteIds.has(r.id))
-      .map((r, index) => ({
-        id: `temp-shift-${r.id}`,
-        date: today,
-        shiftType: 'morning' as const,
-        routeId: r.id,
-        routeName: r.name,
-        driver: r.driver,
-        caretaker: r.caretaker,
-        alightingCheck: false,
-        cabinCheck: false,
-        studentCount: r.expectedCount,
-        abnormalCount: 0,
-        completedTime: '',
-      }));
+      .map((r) => {
+        const routeAbnormalCount = students.filter(
+          (s) => s.routeId === r.id && s.followUpStatus !== 'confirmed'
+        ).length;
+        return {
+          id: `temp-shift-${r.id}`,
+          date: today,
+          shiftType: 'morning' as const,
+          routeId: r.id,
+          routeName: r.name,
+          driver: r.driver,
+          caretaker: r.caretaker,
+          alightingCheck: false,
+          cabinCheck: false,
+          studentCount: r.expectedCount,
+          abnormalCount: routeAbnormalCount,
+          completedTime: '',
+        };
+      });
 
-    const allShifts = [...existingShifts, ...missingShifts];
+    const allShifts = [...existingShifts, ...missingShifts].map((shift) => {
+      const routeAbnormalCount = students.filter(
+        (s) => s.routeId === shift.routeId && s.followUpStatus !== 'confirmed'
+      ).length;
+      return {
+        ...shift,
+        abnormalCount: routeAbnormalCount > 0 ? routeAbnormalCount : shift.abnormalCount,
+      };
+    });
 
     return allShifts.sort((a, b) => {
       const aIncomplete = !a.alightingCheck || !a.cabinCheck ? 1 : 0;
@@ -234,52 +369,96 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   getStudentDetailsByRoute: (routeId) => {
     const { routeStudentDetails, routes, students } = get();
     const route = routes.find((r) => r.id === routeId);
-
-    if (routeStudentDetails[routeId]) {
-      return routeStudentDetails[routeId];
-    }
-
     if (!route) return [];
 
+    const existingDetails = routeStudentDetails[routeId] || [];
     const abnormalStudents = students.filter((s) => s.routeId === routeId);
-    const placeholderDetails: StudentDetail[] = [];
 
-    for (let i = 0; i < route.boardedCount; i++) {
-      placeholderDetails.push({
-        id: `${routeId}-b-${i}`,
-        name: `学生${i + 1}`,
-        className: '待同步',
-        station: '待同步',
-        status: 'boarded',
-        boardedTime: '待同步',
-      });
+    const boardedFromDetails = existingDetails.filter((d) => d.status === 'boarded');
+    const unconfirmedFromDetails = existingDetails.filter((d) => d.status === 'unconfirmed');
+    const abnormalFromDetails = existingDetails.filter((d) => d.status === 'abnormal');
+
+    const result: StudentDetail[] = [];
+
+    const boardedCount = Math.max(route.boardedCount, boardedFromDetails.length);
+    for (let i = 0; i < boardedCount; i++) {
+      if (i < boardedFromDetails.length) {
+        result.push(boardedFromDetails[i]);
+      } else {
+        result.push({
+          id: `${routeId}-b-${i}`,
+          name: `已上车${i + 1}`,
+          className: '待同步',
+          station: '待同步',
+          status: 'boarded',
+          boardedTime: '待同步',
+        });
+      }
     }
 
-    for (let i = 0; i < route.unconfirmedCount; i++) {
-      placeholderDetails.push({
-        id: `${routeId}-u-${i}`,
-        name: `未确认${i + 1}`,
-        className: '待同步',
-        station: '待同步',
-        status: 'unconfirmed',
-      });
+    const unconfirmedCount = Math.max(route.unconfirmedCount, unconfirmedFromDetails.length);
+    for (let i = 0; i < unconfirmedCount; i++) {
+      if (i < unconfirmedFromDetails.length) {
+        result.push(unconfirmedFromDetails[i]);
+      } else {
+        result.push({
+          id: `${routeId}-u-${i}`,
+          name: `未确认${i + 1}`,
+          className: '待同步',
+          station: '待同步',
+          status: 'unconfirmed',
+        });
+      }
     }
 
+    const abnormalIds = new Set(abnormalFromDetails.map((d) => d.id));
+    abnormalFromDetails.forEach((d) => result.push(d));
     abnormalStudents.forEach((s) => {
-      placeholderDetails.push({
-        id: s.id,
-        name: s.name,
-        className: s.className,
-        station: s.station,
-        status: 'abnormal',
-        abnormalType: s.abnormalType,
-        abnormalNote: s.caretakerNote,
-        contactPerson: s.contactPerson,
-        contactPhone: s.contactPhone,
-      });
+      if (!abnormalIds.has(s.id)) {
+        result.push({
+          id: s.id,
+          name: s.name,
+          className: s.className,
+          station: s.station,
+          status: 'abnormal',
+          abnormalType: s.abnormalType,
+          abnormalNote: s.caretakerNote,
+          contactPerson: s.contactPerson,
+          contactPhone: s.contactPhone,
+        });
+      }
     });
 
-    return placeholderDetails;
+    const totalDisplayed = result.filter((d) => d.status === 'boarded').length +
+      result.filter((d) => d.status === 'unconfirmed').length +
+      result.filter((d) => d.status === 'abnormal').length;
+
+    if (totalDisplayed < route.expectedCount) {
+      const fillCount = route.expectedCount - totalDisplayed;
+      for (let i = 0; i < fillCount; i++) {
+        result.push({
+          id: `${routeId}-f-${i}`,
+          name: `待点名${i + 1}`,
+          className: '待同步',
+          station: '待同步',
+          status: 'unconfirmed',
+        });
+      }
+    }
+
+    return result;
+  },
+
+  getDisposalActionsByRoute: (routeId) => {
+    const { disposalActions } = get();
+    return disposalActions
+      .filter((a) => a.routeId === routeId)
+      .sort((a, b) => b.time.localeCompare(a.time));
+  },
+
+  getAllDisposalActions: () => {
+    const { disposalActions } = get();
+    return [...disposalActions].sort((a, b) => b.time.localeCompare(a.time));
   },
 
   simulateDataUpdate: () =>

@@ -16,6 +16,8 @@ import {
   Activity,
   PhoneCall,
   Timer,
+  Car,
+  UserCheck,
 } from 'lucide-react';
 import { abnormalTypeLabels } from '../data/mockData';
 import {
@@ -34,14 +36,19 @@ export default function RouteDetail() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [activeGroup, setActiveGroup] = useState<StudentStatus | 'all'>('all');
-  const [activeTab, setActiveTab] = useState<'students' | 'actions'>('students');
+  const [activeTab, setActiveTab] = useState<'students' | 'actions' | 'shift'>('students');
+  const [highlightedShift, setHighlightedShift] = useState(false);
 
   const studentRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const shiftPanelRef = useRef<HTMLDivElement | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
   const getRouteById = useDashboardStore((state) => state.getRouteById);
   const getStudentDetailsByRoute = useDashboardStore((state) => state.getStudentDetailsByRoute);
   const getDisposalActionsByRoute = useDashboardStore((state) => state.getDisposalActionsByRoute);
+  const getShiftByRouteId = useDashboardStore((state) => state.getShiftByRouteId);
+  const getTodayMorningShifts = useDashboardStore((state) => state.getTodayMorningShifts);
+  const urgeCabinCheck = useDashboardStore((state) => state.urgeCabinCheck);
   const routeStudentDetails = useDashboardStore((state) => state.routeStudentDetails);
   const updateStudentFollowUp = useDashboardStore((state) => state.updateStudentFollowUp);
   const students = useDashboardStore((state) => state.students);
@@ -56,9 +63,32 @@ export default function RouteDetail() {
     [students, id]
   );
 
+  const todayShift = useMemo(() => {
+    const existing = getShiftByRouteId(id || '');
+    if (existing) return existing;
+    const allTodayShifts = getTodayMorningShifts();
+    return allTodayShifts.find((s) => s.routeId === id);
+  }, [id, getShiftByRouteId, getTodayMorningShifts]);
+
   useEffect(() => {
     const highlightStudentId = searchParams.get('student');
-    if (highlightStudentId) {
+    const tabParam = searchParams.get('tab');
+
+    if (tabParam === 'shift') {
+      setActiveTab('shift');
+      setHighlightedShift(true);
+      setTimeout(() => {
+        if (shiftPanelRef.current) {
+          shiftPanelRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          shiftPanelRef.current.classList.add('ring-4', 'ring-yellow-400', 'ring-opacity-75');
+          setTimeout(() => {
+            shiftPanelRef.current?.classList.remove('ring-4', 'ring-yellow-400', 'ring-opacity-75');
+            setHighlightedShift(false);
+          }, 3000);
+        }
+      }, 200);
+    } else if (highlightStudentId) {
+      setActiveTab('students');
       setHighlightedId(highlightStudentId);
       setActiveGroup('abnormal');
 
@@ -94,6 +124,10 @@ export default function RouteDetail() {
 
   const handleCall = (phone: string) => {
     window.location.href = `tel:${phone.replace(/-/g, '')}`;
+  };
+
+  const handleUrgeCabin = () => {
+    if (id) urgeCabinCheck(id);
   };
 
   if (!route) {
@@ -288,6 +322,35 @@ export default function RouteDetail() {
                   </div>
                 </div>
               </div>
+
+              {todayShift && (!todayShift.alightingCheck || !todayShift.cabinCheck) && (
+                <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="w-4 h-4 text-red-400" />
+                    <span className="text-sm font-semibold text-red-400">待清查项</span>
+                  </div>
+                  <div className="space-y-1 text-xs">
+                    {!todayShift.alightingCheck && (
+                      <div className="flex items-center gap-2 text-red-300">
+                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                        缺下车点名
+                      </div>
+                    )}
+                    {!todayShift.cabinCheck && (
+                      <div className="flex items-center gap-2 text-red-300">
+                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                        缺车厢清查
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('shift')}
+                    className="mt-3 w-full text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 py-2 rounded-lg transition-colors"
+                  >
+                    前往清查处理
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -305,6 +368,22 @@ export default function RouteDetail() {
                   >
                     <Users className="w-4 h-4" />
                     学生点名明细
+                  </button>
+                  <button
+                    className={`flex items-center gap-2 text-xs px-4 py-2 rounded-md transition-colors ${
+                      activeTab === 'shift'
+                        ? 'bg-red-600 text-white'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                    onClick={() => setActiveTab('shift')}
+                  >
+                    <Car className="w-4 h-4" />
+                    班次清查处理
+                    {todayShift && (!todayShift.alightingCheck || !todayShift.cabinCheck) && (
+                      <span className="bg-red-400 text-white px-1.5 py-0.5 rounded text-xs animate-pulse">
+                        待处理
+                      </span>
+                    )}
                   </button>
                   <button
                     className={`flex items-center gap-2 text-xs px-4 py-2 rounded-md transition-colors ${
@@ -503,6 +582,218 @@ export default function RouteDetail() {
                       })}
                     </div>
                   )}
+                </>
+              )}
+
+              {activeTab === 'shift' && (
+                <>
+                  <div
+                    ref={shiftPanelRef}
+                    className={`transition-all duration-300 rounded-xl ${
+                      highlightedShift ? 'ring-4 ring-yellow-400 ring-opacity-75' : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
+                          <Car className="w-5 h-5 text-red-400" />
+                        </div>
+                        <div>
+                          <h2 className="text-xl font-bold text-white">班次清查处理</h2>
+                          <p className="text-sm text-slate-400">
+                            今日早班 - {route.name}
+                          </p>
+                        </div>
+                      </div>
+                      {todayShift && !todayShift.completedTime && (
+                        <button
+                          onClick={handleUrgeCabin}
+                          className="bg-yellow-600 hover:bg-yellow-500 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          催促清查
+                        </button>
+                      )}
+                    </div>
+
+                    {!todayShift ? (
+                      <div className="text-center py-12 text-slate-500">
+                        <Car className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                        <p className="text-lg">暂无今日早班记录</p>
+                        <p className="text-sm mt-2">该线路班次信息尚未生成</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="p-4 bg-dark-900/50 rounded-xl border border-slate-700/50">
+                            <div className="text-xs text-slate-500 mb-1">车辆</div>
+                            <div className="text-white font-semibold text-lg">{todayShift.routeName}</div>
+                            <div className="text-xs text-slate-400 mt-1">
+                              {todayShift.date} · 早班
+                            </div>
+                          </div>
+                          <div className="p-4 bg-dark-900/50 rounded-xl border border-slate-700/50">
+                            <div className="text-xs text-slate-500 mb-1">乘务人员</div>
+                            <div className="text-white font-semibold">
+                              <span className="text-green-400">{todayShift.driver}</span>
+                              <span className="text-slate-500 mx-2">/</span>
+                              <span className="text-purple-400">{todayShift.caretaker}</span>
+                            </div>
+                            <div className="text-xs text-slate-400 mt-1">司机 / 照管员</div>
+                          </div>
+                          <div className="p-4 bg-dark-900/50 rounded-xl border border-slate-700/50">
+                            <div className="text-xs text-slate-500 mb-1">班次状态</div>
+                            {todayShift.completedTime ? (
+                              <>
+                                <div className="text-green-400 font-semibold text-lg flex items-center gap-2">
+                                  <CheckCircle2 className="w-5 h-5" />
+                                  已完成
+                                </div>
+                                <div className="text-xs text-slate-400 mt-1 font-mono">
+                                  完成时间 {todayShift.completedTime}
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="text-orange-400 font-semibold text-lg flex items-center gap-2">
+                                  <Timer className="w-5 h-5" />
+                                  进行中
+                                </div>
+                                <div className="text-xs text-slate-400 mt-1">
+                                  学生 {todayShift.studentCount} 人
+                                  {todayShift.abnormalCount > 0 && (
+                                    <span className="text-red-400 ml-2">
+                                      · 异常 {todayShift.abnormalCount} 人
+                                    </span>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div
+                            className={`p-5 rounded-xl border transition-all ${
+                              todayShift.alightingCheck
+                                ? 'bg-green-500/10 border-green-500/30'
+                                : 'bg-red-500/10 border-red-500/30 animate-pulse'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                                    todayShift.alightingCheck
+                                      ? 'bg-green-500/20'
+                                      : 'bg-red-500/20'
+                                  }`}
+                                >
+                                  <UserCheck
+                                    className={`w-6 h-6 ${
+                                      todayShift.alightingCheck ? 'text-green-400' : 'text-red-400'
+                                    }`}
+                                  />
+                                </div>
+                                <div>
+                                  <div
+                                    className={`text-lg font-semibold ${
+                                      todayShift.alightingCheck ? 'text-green-400' : 'text-red-400'
+                                    }`}
+                                  >
+                                    下车点名
+                                  </div>
+                                  <div className="text-xs text-slate-400">
+                                    学生到达学校后全员下车点名核对
+                                  </div>
+                                </div>
+                              </div>
+                              {todayShift.alightingCheck ? (
+                                <span className="flex items-center gap-1 text-xs bg-green-500/20 text-green-400 px-3 py-1 rounded-full">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  已完成
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1 text-xs bg-red-500/20 text-red-400 px-3 py-1 rounded-full">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  待完成
+                                </span>
+                              )}
+                            </div>
+                            {!todayShift.alightingCheck && (
+                              <div className="text-sm text-red-300 bg-red-500/10 p-3 rounded-lg">
+                                ⚠️ 照管员尚未提交下车点名记录，请及时联系确认学生安全
+                              </div>
+                            )}
+                          </div>
+
+                          <div
+                            className={`p-5 rounded-xl border transition-all ${
+                              todayShift.cabinCheck
+                                ? 'bg-green-500/10 border-green-500/30'
+                                : 'bg-red-500/10 border-red-500/30 animate-pulse'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                                    todayShift.cabinCheck
+                                      ? 'bg-green-500/20'
+                                      : 'bg-red-500/20'
+                                  }`}
+                                >
+                                  <Car
+                                    className={`w-6 h-6 ${
+                                      todayShift.cabinCheck ? 'text-green-400' : 'text-red-400'
+                                    }`}
+                                  />
+                                </div>
+                                <div>
+                                  <div
+                                    className={`text-lg font-semibold ${
+                                      todayShift.cabinCheck ? 'text-green-400' : 'text-red-400'
+                                    }`}
+                                  >
+                                    车厢清查
+                                  </div>
+                                  <div className="text-xs text-slate-400">
+                                    司机对照管员确认车厢内无遗留学生
+                                  </div>
+                                </div>
+                              </div>
+                              {todayShift.cabinCheck ? (
+                                <span className="flex items-center gap-1 text-xs bg-green-500/20 text-green-400 px-3 py-1 rounded-full">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  已完成
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1 text-xs bg-red-500/20 text-red-400 px-3 py-1 rounded-full">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  待完成
+                                </span>
+                              )}
+                            </div>
+                            {!todayShift.cabinCheck && (
+                              <div className="text-sm text-red-300 bg-red-500/10 p-3 rounded-lg">
+                                ⚠️ 尚未完成车厢清查，防止学生遗留在车内
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="p-4 bg-dark-900/50 rounded-xl border border-slate-700/50">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-slate-500" />
+                              <span className="text-sm text-slate-400">班次ID</span>
+                            </div>
+                            <span className="text-xs text-slate-500 font-mono">{todayShift.id}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
 

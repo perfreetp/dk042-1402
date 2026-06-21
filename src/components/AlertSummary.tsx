@@ -1,7 +1,8 @@
-import { AlertTriangle, Bus, Phone, Clock, User, ChevronRight, Search, Car, Users } from 'lucide-react';
+import { AlertTriangle, Bus, Phone, Clock, User, ChevronRight, Search, Car, Users, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import type { AlertItem } from '../types';
+import { useDashboardStore } from '../store/dashboardStore';
 
 interface AlertSummaryProps {
   alerts: AlertItem[];
@@ -10,6 +11,7 @@ interface AlertSummaryProps {
 export default function AlertSummary({ alerts }: AlertSummaryProps) {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState<'all' | 'route' | 'student' | 'cabin_check'>('all');
+  const urgeCabinCheck = useDashboardStore((state) => state.urgeCabinCheck);
 
   const urgentCount = alerts.filter((a) => a.priority === 1).length;
   const routeAlertCount = alerts.filter((a) => a.type === 'route').length;
@@ -25,12 +27,19 @@ export default function AlertSummary({ alerts }: AlertSummaryProps) {
     window.location.href = `tel:${phone.replace(/-/g, '')}`;
   };
 
-  const handleViewRoute = (routeId: string, studentId?: string) => {
-    if (studentId) {
+  const handleViewRoute = (routeId: string, studentId?: string, isCabinCheck?: boolean) => {
+    if (isCabinCheck) {
+      navigate(`/route/${routeId}?tab=shift`);
+    } else if (studentId) {
       navigate(`/route/${routeId}?student=${studentId}`);
     } else {
       navigate(`/route/${routeId}`);
     }
+  };
+
+  const handleUrgeCabinCheck = (routeId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    urgeCabinCheck(routeId);
   };
 
   const getTypeIcon = (type: string) => {
@@ -143,69 +152,81 @@ export default function AlertSummary({ alerts }: AlertSummaryProps) {
       </div>
 
       <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
-        {filteredAlerts.map((alert, index) => (
-          <div
-            key={alert.id}
-            className={`flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer group
-                       ${alert.priority === 1 
-                         ? 'bg-red-500/10 border border-red-500/30 hover:bg-red-500/15 hover:border-red-500/50' 
-                         : 'bg-dark-800/50 border border-slate-700/50 hover:bg-dark-800/70 hover:border-slate-600'
-                       } ${alert.type === 'route' ? 'animate-glow' : ''}`}
-            style={{ animationDelay: `${index * 0.05}s` }}
-            onClick={() => {
-              if (alert.routeId) {
-                handleViewRoute(alert.routeId, alert.studentId);
-              }
-            }}
-          >
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0
-                           ${getTypeIconBg(alert.type)}`}>
-              {getTypeIcon(alert.type)}
-            </div>
+        {filteredAlerts.map((alert, index) => {
+          const isCabin = alert.type === 'cabin_check';
+          return (
+            <div
+              key={alert.id}
+              className={`flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer group
+                         ${alert.priority === 1
+                           ? 'bg-red-500/10 border border-red-500/30 hover:bg-red-500/15 hover:border-red-500/50'
+                           : 'bg-dark-800/50 border border-slate-700/50 hover:bg-dark-800/70 hover:border-slate-600'
+                         } ${alert.type === 'route' ? 'animate-glow' : ''}`}
+              style={{ animationDelay: `${index * 0.05}s` }}
+              onClick={() => {
+                if (alert.routeId) {
+                  handleViewRoute(alert.routeId, alert.studentId, isCabin);
+                }
+              }}
+            >
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0
+                             ${getTypeIconBg(alert.type)}`}>
+                {getTypeIcon(alert.type)}
+              </div>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                {alert.priority === 1 && (
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-red-500 text-white font-medium">
-                    紧急
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  {alert.priority === 1 && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-red-500 text-white font-medium">
+                      紧急
+                    </span>
+                  )}
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-400">
+                    {getTypeLabel(alert.type)}
                   </span>
-                )}
-                <span className="text-xs px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-400">
-                  {getTypeLabel(alert.type)}
-                </span>
-                <span className="font-semibold text-white truncate">{alert.title}</span>
+                  <span className="font-semibold text-white truncate">{alert.title}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <span className="truncate">{alert.subtitle}</span>
+                  <span className="text-slate-600">·</span>
+                  <span className={`font-medium ${alert.statusColor}`}>
+                    {alert.status}
+                  </span>
+                  <span className="text-slate-600">·</span>
+                  <span className="flex items-center gap-1 flex-shrink-0">
+                    <Clock className="w-3 h-3" />
+                    {alert.reportTime}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <span className="truncate">{alert.subtitle}</span>
-                <span className="text-slate-600">·</span>
-                <span className={`font-medium ${alert.statusColor}`}>
-                  {alert.status}
-                </span>
-                <span className="text-slate-600">·</span>
-                <span className="flex items-center gap-1 flex-shrink-0">
-                  <Clock className="w-3 h-3" />
-                  {alert.reportTime}
-                </span>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors
-                           ${alert.priority === 1 
-                             ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400' 
-                             : 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-400'}`}
-                onClick={(e) => handleCall(alert.contactPhone, e)}
-                title={`联系 ${alert.contactName}`}
-              >
-                <Phone className="w-4 h-4" />
-              </button>
-              <div className="w-9 h-9 rounded-lg bg-slate-700/50 group-hover:bg-slate-700 flex items-center justify-center text-slate-400 group-hover:text-white transition-colors">
-                <ChevronRight className="w-4 h-4" />
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {isCabin && (
+                  <button
+                    className="w-9 h-9 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 flex items-center justify-center transition-colors"
+                    onClick={(e) => handleUrgeCabinCheck(alert.routeId!, e)}
+                    title="催促清查"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors
+                             ${alert.priority === 1
+                               ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
+                               : 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-400'}`}
+                  onClick={(e) => handleCall(alert.contactPhone, e)}
+                  title={`联系 ${alert.contactName}`}
+                >
+                  <Phone className="w-4 h-4" />
+                </button>
+                <div className="w-9 h-9 rounded-lg bg-slate-700/50 group-hover:bg-slate-700 flex items-center justify-center text-slate-400 group-hover:text-white transition-colors">
+                  <ChevronRight className="w-4 h-4" />
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {filteredAlerts.length === 0 && (
           <div className="text-center py-8 text-slate-500">

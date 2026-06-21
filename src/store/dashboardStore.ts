@@ -56,10 +56,13 @@ interface DashboardState {
   getRouteById: (routeId: string) => Route | undefined;
   getStudentsByRoute: (routeId: string) => Student[];
   getTodayMorningShifts: () => Shift[];
+  getShiftByRouteId: (routeId: string) => Shift | undefined;
   getAlerts: () => AlertItem[];
   getStudentDetailsByRoute: (routeId: string) => StudentDetail[];
   getDisposalActionsByRoute: (routeId: string) => DisposalAction[];
   getAllDisposalActions: () => DisposalAction[];
+
+  urgeCabinCheck: (routeId: string) => void;
 
   simulateDataUpdate: () => void;
 }
@@ -264,11 +267,47 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     });
 
     return allShifts.sort((a, b) => {
+      const aIsTemp = a.id.startsWith('temp-shift-') ? 0 : 1;
+      const bIsTemp = b.id.startsWith('temp-shift-') ? 0 : 1;
+      if (aIsTemp !== bIsTemp) return bIsTemp - aIsTemp;
+
       const aIncomplete = !a.alightingCheck || !a.cabinCheck ? 1 : 0;
       const bIncomplete = !b.alightingCheck || !b.cabinCheck ? 1 : 0;
       if (aIncomplete !== bIncomplete) return aIncomplete - bIncomplete;
       return a.routeName.localeCompare(b.routeName);
     });
+  },
+
+  getShiftByRouteId: (routeId: string) => {
+    const { shifts } = get();
+    const today = getTodayDateString();
+    return shifts.find(
+      (s) => s.routeId === routeId && s.date === today && s.shiftType === 'morning'
+    );
+  },
+
+  urgeCabinCheck: (routeId: string) => {
+    const { currentOperator, currentOperatorRole, addDisposalAction, shifts } = get();
+    const today = getTodayDateString();
+    const shift = shifts.find(
+      (s) => s.routeId === routeId && s.date === today && s.shiftType === 'morning'
+    );
+    const route = get().routes.find((r) => r.id === routeId);
+
+    if (!shift || !route) return;
+
+    const missingItems = [];
+    if (!shift.alightingCheck) missingItems.push('下车点名');
+    if (!shift.cabinCheck) missingItems.push('车厢清查');
+    const missingText = missingItems.join('、') || '检查';
+
+    addDisposalAction(
+      'urge_cabin_check',
+      routeId,
+      `${shift.routeName} - 催促${missingText}`,
+      `值班老师${currentOperator}联系照管员${shift.caretaker}，催促完成${missingText}`,
+      { priority: 1 }
+    );
   },
 
   getAlerts: () => {
@@ -379,43 +418,17 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     const abnormalFromDetails = existingDetails.filter((d) => d.status === 'abnormal');
 
     const result: StudentDetail[] = [];
+    const usedIds = new Set<string>();
 
-    const boardedCount = Math.max(route.boardedCount, boardedFromDetails.length);
-    for (let i = 0; i < boardedCount; i++) {
-      if (i < boardedFromDetails.length) {
-        result.push(boardedFromDetails[i]);
-      } else {
-        result.push({
-          id: `${routeId}-b-${i}`,
-          name: `已上车${i + 1}`,
-          className: '待同步',
-          station: '待同步',
-          status: 'boarded',
-          boardedTime: '待同步',
-        });
-      }
-    }
-
-    const unconfirmedCount = Math.max(route.unconfirmedCount, unconfirmedFromDetails.length);
-    for (let i = 0; i < unconfirmedCount; i++) {
-      if (i < unconfirmedFromDetails.length) {
-        result.push(unconfirmedFromDetails[i]);
-      } else {
-        result.push({
-          id: `${routeId}-u-${i}`,
-          name: `未确认${i + 1}`,
-          className: '待同步',
-          station: '待同步',
-          status: 'unconfirmed',
-        });
-      }
-    }
-
-    const abnormalIds = new Set(abnormalFromDetails.map((d) => d.id));
-    abnormalFromDetails.forEach((d) => result.push(d));
+    const abnormalList: StudentDetail[] = [];
+    const abnormalDetailIds = new Set(abnormalFromDetails.map((d) => d.id));
+    abnormalFromDetails.forEach((d) => {
+      abnormalList.push(d);
+      usedIds.add(d.id);
+    });
     abnormalStudents.forEach((s) => {
-      if (!abnormalIds.has(s.id)) {
-        result.push({
+      if (!abnormalDetailIds.has(s.id)) {
+        abnormalList.push({
           id: s.id,
           name: s.name,
           className: s.className,
@@ -426,23 +439,83 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           contactPerson: s.contactPerson,
           contactPhone: s.contactPhone,
         });
+        usedIds.add(s.id);
       }
     });
 
-    const totalDisplayed = result.filter((d) => d.status === 'boarded').length +
-      result.filter((d) => d.status === 'unconfirmed').length +
-      result.filter((d) => d.status === 'abnormal').length;
-
-    if (totalDisplayed < route.expectedCount) {
-      const fillCount = route.expectedCount - totalDisplayed;
-      for (let i = 0; i < fillCount; i++) {
+    const boardedTargetCount = Math.min(
+      Math.max(route.boardedCount, boardedFromDetails.length),
+      route.expectedCount
+    );
+    let boardedAdded = 0;
+    for (let i = 0; i < boardedFromDetails.length && boardedAdded < boardedTargetCount; i++) {
+      if (!usedIds.has(boardedFromDetails[i].id)) {
+        result.push(boardedFromDetails[i]);
+        usedIds.add(boardedFromDetails[i].id);
+        boardedAdded++;
+      }
+    }
+    while (boardedAdded < boardedTargetCount) {
+      const newId = `${routeId}-b-${boardedAdded}`;
+      if (!usedIds.has(newId)) {
         result.push({
-          id: `${routeId}-f-${i}`,
-          name: `待点名${i + 1}`,
+          id: newId,
+          name: `已上车${boardedAdded + 1}`,
+          className: '待同步',
+          station: '待同步',
+          status: 'boarded',
+          boardedTime: '待同步',
+        });
+        usedIds.add(newId);
+      }
+      boardedAdded++;
+    }
+
+    const remainingSlots = route.expectedCount - boardedAdded - abnormalList.length;
+    const unconfirmedTargetCount = Math.min(
+      Math.max(route.unconfirmedCount, unconfirmedFromDetails.length),
+      Math.max(0, remainingSlots)
+    );
+    let unconfirmedAdded = 0;
+    for (let i = 0; i < unconfirmedFromDetails.length && unconfirmedAdded < unconfirmedTargetCount; i++) {
+      if (!usedIds.has(unconfirmedFromDetails[i].id)) {
+        result.push(unconfirmedFromDetails[i]);
+        usedIds.add(unconfirmedFromDetails[i].id);
+        unconfirmedAdded++;
+      }
+    }
+    while (unconfirmedAdded < unconfirmedTargetCount) {
+      const newId = `${routeId}-u-${unconfirmedAdded}`;
+      if (!usedIds.has(newId)) {
+        result.push({
+          id: newId,
+          name: `未确认${unconfirmedAdded + 1}`,
           className: '待同步',
           station: '待同步',
           status: 'unconfirmed',
         });
+        usedIds.add(newId);
+      }
+      unconfirmedAdded++;
+    }
+
+    abnormalList.forEach((a) => result.push(a));
+
+    const finalTotal = boardedAdded + unconfirmedAdded + abnormalList.length;
+    if (finalTotal < route.expectedCount) {
+      const fillCount = route.expectedCount - finalTotal;
+      for (let i = 0; i < fillCount; i++) {
+        const newId = `${routeId}-f-${i}`;
+        if (!usedIds.has(newId)) {
+          result.push({
+            id: newId,
+            name: `待点名${i + 1}`,
+            className: '待同步',
+            station: '待同步',
+            status: 'unconfirmed',
+          });
+          usedIds.add(newId);
+        }
       }
     }
 

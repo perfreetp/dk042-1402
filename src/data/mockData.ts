@@ -140,6 +140,7 @@ export const initialStudents: Student[] = [
     followUpStatus: 'pending',
     followUpNote: '',
     followUpTime: '',
+    followUpRecords: [],
     status: 'abnormal',
   },
   {
@@ -158,6 +159,16 @@ export const initialStudents: Student[] = [
     followUpStatus: 'contacted',
     followUpNote: '已联系母亲，正在前往正确站点',
     followUpTime: '07:09:00',
+    followUpRecords: [
+      {
+        id: 'rec-s2-1',
+        status: 'contacted',
+        operator: '李老师',
+        operatorRole: 'caretaker',
+        note: '发现学生在错误站点等车，立即联系母亲确认位置',
+        time: '07:09:00',
+      },
+    ],
     status: 'abnormal',
   },
   {
@@ -176,6 +187,24 @@ export const initialStudents: Student[] = [
     followUpStatus: 'confirmed',
     followUpNote: '家长确认已安全送达学校',
     followUpTime: '07:20:00',
+    followUpRecords: [
+      {
+        id: 'rec-s3-1',
+        status: 'contacted',
+        operator: '王老师',
+        operatorRole: 'caretaker',
+        note: '家长打电话告知今天自己送孩子',
+        time: '07:02:45',
+      },
+      {
+        id: 'rec-s3-2',
+        status: 'confirmed',
+        operator: '王主任',
+        operatorRole: 'duty_officer',
+        note: '家长回电确认已安全送达学校',
+        time: '07:20:00',
+      },
+    ],
     status: 'abnormal',
   },
   {
@@ -194,6 +223,7 @@ export const initialStudents: Student[] = [
     followUpStatus: 'pending',
     followUpNote: '',
     followUpTime: '',
+    followUpRecords: [],
     status: 'abnormal',
   },
   {
@@ -212,6 +242,24 @@ export const initialStudents: Student[] = [
     followUpStatus: 'waiting',
     followUpNote: '已联系母亲，等待回复中',
     followUpTime: '07:12:00',
+    followUpRecords: [
+      {
+        id: 'rec-s5-1',
+        status: 'contacted',
+        operator: '周老师',
+        operatorRole: 'caretaker',
+        note: '发现学生未到，联系母亲询问情况',
+        time: '07:11:00',
+      },
+      {
+        id: 'rec-s5-2',
+        status: 'waiting',
+        operator: '周老师',
+        operatorRole: 'caretaker',
+        note: '母亲说可能睡过头了，去看看孩子再回电',
+        time: '07:12:00',
+      },
+    ],
     status: 'abnormal',
   },
   {
@@ -230,6 +278,24 @@ export const initialStudents: Student[] = [
     followUpStatus: 'confirmed',
     followUpNote: '家长微信确认已到校',
     followUpTime: '07:30:00',
+    followUpRecords: [
+      {
+        id: 'rec-s6-1',
+        status: 'contacted',
+        operator: '陈老师',
+        operatorRole: 'caretaker',
+        note: '家长提前微信告知今天自己送',
+        time: '06:55:00',
+      },
+      {
+        id: 'rec-s6-2',
+        status: 'confirmed',
+        operator: '陈老师',
+        operatorRole: 'caretaker',
+        note: '家长微信发照片确认孩子已到校门口',
+        time: '07:30:00',
+      },
+    ],
     status: 'abnormal',
   },
 ];

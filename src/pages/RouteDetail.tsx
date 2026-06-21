@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -12,18 +12,25 @@ import {
   HelpCircle,
   Users,
   Shield,
+  RefreshCw,
 } from 'lucide-react';
-import { initialRoutes, routeStudentDetails, abnormalTypeLabels } from '../data/mockData';
+import { abnormalTypeLabels } from '../data/mockData';
 import { studentStatusLabels, studentStatusColors } from '../types';
 import type { StudentDetail, StudentStatus } from '../types';
+import { useDashboardStore } from '../store/dashboardStore';
 
 export default function RouteDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [activeGroup, setActiveGroup] = useState<StudentStatus | 'all'>('all');
 
-  const route = initialRoutes.find((r) => r.id === id);
-  const students = routeStudentDetails[id || ''] || [];
+  const getRouteById = useDashboardStore((state) => state.getRouteById);
+  const getStudentDetailsByRoute = useDashboardStore((state) => state.getStudentDetailsByRoute);
+  const routeStudentDetails = useDashboardStore((state) => state.routeStudentDetails);
+
+  const route = getRouteById(id || '');
+  const hasDetailData = routeStudentDetails[id || ''] !== undefined;
+  const students = getStudentDetailsByRoute(id || '');
 
   const groupedStudents: Record<StudentStatus | 'all', StudentDetail[]> = {
     all: students,
@@ -265,6 +272,17 @@ export default function RouteDetail() {
                   ))}
                 </div>
               </div>
+
+              {!hasDetailData && (
+                <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4 text-yellow-400 animate-spin" />
+                    <span className="text-sm text-yellow-400">
+                      学生明细数据同步中，当前为实时推算数据，点名信息将陆续更新
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {students.length === 0 ? (
                 <div className="text-center py-12 text-slate-500">

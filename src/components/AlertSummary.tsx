@@ -1,5 +1,6 @@
-import { AlertTriangle, Bus, Phone, Clock, User, ChevronRight } from 'lucide-react';
+import { AlertTriangle, Bus, Phone, Clock, User, ChevronRight, Search, Car, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import type { AlertItem } from '../types';
 
 interface AlertSummaryProps {
@@ -8,21 +9,75 @@ interface AlertSummaryProps {
 
 export default function AlertSummary({ alerts }: AlertSummaryProps) {
   const navigate = useNavigate();
+  const [activeFilter, setActiveFilter] = useState<'all' | 'route' | 'student' | 'cabin_check'>('all');
 
   const urgentCount = alerts.filter((a) => a.priority === 1).length;
-  const abnormalRouteCount = alerts.filter((a) => a.type === 'route' && a.priority === 1).length;
-  const delayedRouteCount = alerts.filter((a) => a.type === 'route' && a.priority === 2).length;
-  const pendingStudentCount = alerts.filter((a) => a.type === 'student' && a.priority === 2).length;
+  const routeAlertCount = alerts.filter((a) => a.type === 'route').length;
+  const studentAlertCount = alerts.filter((a) => a.type === 'student').length;
+  const cabinAlertCount = alerts.filter((a) => a.type === 'cabin_check').length;
+
+  const filteredAlerts = activeFilter === 'all'
+    ? alerts
+    : alerts.filter((a) => a.type === activeFilter);
 
   const handleCall = (phone: string, e: React.MouseEvent) => {
     e.stopPropagation();
     window.location.href = `tel:${phone.replace(/-/g, '')}`;
   };
 
-  const handleViewRoute = (routeId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigate(`/route/${routeId}`);
+  const handleViewRoute = (routeId: string, studentId?: string) => {
+    if (studentId) {
+      navigate(`/route/${routeId}?student=${studentId}`);
+    } else {
+      navigate(`/route/${routeId}`);
+    }
   };
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'route':
+        return <Bus className="w-4 h-4 text-blue-400" />;
+      case 'student':
+        return <User className="w-4 h-4 text-orange-400" />;
+      case 'cabin_check':
+        return <Car className="w-4 h-4 text-red-400" />;
+      default:
+        return <AlertTriangle className="w-4 h-4 text-yellow-400" />;
+    }
+  };
+
+  const getTypeIconBg = (type: string) => {
+    switch (type) {
+      case 'route':
+        return 'bg-blue-500/20';
+      case 'student':
+        return 'bg-orange-500/20';
+      case 'cabin_check':
+        return 'bg-red-500/20';
+      default:
+        return 'bg-yellow-500/20';
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'route':
+        return '线路';
+      case 'student':
+        return '学生';
+      case 'cabin_check':
+        return '清查';
+      default:
+        return '告警';
+    }
+  };
+
+  const filters = [
+    { key: 'all' as const, label: '全部', count: alerts.length, icon: <AlertTriangle className="w-3.5 h-3.5" /> },
+    { key: 'route' as const, label: '线路', count: routeAlertCount, icon: <Bus className="w-3.5 h-3.5" /> },
+    { key: 'student' as const, label: '学生', count: studentAlertCount, icon: <Users className="w-3.5 h-3.5" /> },
+    { key: 'cabin_check' as const, label: '清查', count: cabinAlertCount, icon: <Car className="w-3.5 h-3.5" /> },
+  ];
 
   if (alerts.length === 0) {
     return (
@@ -55,40 +110,57 @@ export default function AlertSummary({ alerts }: AlertSummaryProps) {
           <div>
             <h2 className="text-xl font-bold text-white">大屏告警汇总</h2>
             <p className="text-sm text-slate-400">
-              需立即处理 <span className="text-red-400 font-semibold">{alerts.length}</span> 项
-              <span className="mx-2 text-slate-600">|</span>
-              紧急 <span className="text-red-400 font-semibold">{urgentCount}</span> 项
+              处置工作台 · 需立即处理 <span className="text-red-400 font-semibold">{alerts.length}</span> 项
             </p>
           </div>
         </div>
-        <div className="text-xs text-slate-500">
+        <div className="text-xs text-slate-500 flex items-center gap-1">
+          <Search className="w-3.5 h-3.5" />
           按优先级自动排序
         </div>
       </div>
 
-      <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
-        {alerts.map((alert, index) => (
+      <div className="flex items-center gap-1 mb-4 bg-dark-900/50 rounded-lg p-1">
+        {filters.map((filter) => (
+          <button
+            key={filter.key}
+            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md transition-colors flex-1 justify-center ${
+              activeFilter === filter.key
+                ? 'bg-red-600 text-white'
+                : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+            }`}
+            onClick={() => setActiveFilter(filter.key)}
+          >
+            {filter.icon}
+            {filter.label}
+            <span className={`px-1.5 py-0.5 rounded text-xs ${
+              activeFilter === filter.key ? 'bg-white/20' : 'bg-slate-700/50'
+            }`}>
+              {filter.count}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+        {filteredAlerts.map((alert, index) => (
           <div
             key={alert.id}
-            className={`flex items-center gap-4 p-3 rounded-xl transition-all cursor-pointer
+            className={`flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer group
                        ${alert.priority === 1 
-                         ? 'bg-red-500/10 border border-red-500/30 hover:bg-red-500/15' 
-                         : 'bg-dark-800/50 border border-slate-700/50 hover:bg-dark-800/70'
+                         ? 'bg-red-500/10 border border-red-500/30 hover:bg-red-500/15 hover:border-red-500/50' 
+                         : 'bg-dark-800/50 border border-slate-700/50 hover:bg-dark-800/70 hover:border-slate-600'
                        } ${alert.type === 'route' ? 'animate-glow' : ''}`}
             style={{ animationDelay: `${index * 0.05}s` }}
-            onClick={(e) => {
-              if (alert.type === 'route' && alert.routeId) {
-                handleViewRoute(alert.routeId, e);
+            onClick={() => {
+              if (alert.routeId) {
+                handleViewRoute(alert.routeId, alert.studentId);
               }
             }}
           >
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0
-                           ${alert.type === 'route' ? 'bg-blue-500/20' : 'bg-orange-500/20'}`}>
-              {alert.type === 'route' ? (
-                <Bus className="w-4 h-4 text-blue-400" />
-              ) : (
-                <User className="w-4 h-4 text-orange-400" />
-              )}
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0
+                           ${getTypeIconBg(alert.type)}`}>
+              {getTypeIcon(alert.type)}
             </div>
 
             <div className="flex-1 min-w-0">
@@ -98,13 +170,17 @@ export default function AlertSummary({ alerts }: AlertSummaryProps) {
                     紧急
                   </span>
                 )}
-                <span className="font-semibold text-white truncate">{alert.title}</span>
-                <span className={`text-xs font-medium ${alert.statusColor}`}>
-                  {alert.status}
+                <span className="text-xs px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-400">
+                  {getTypeLabel(alert.type)}
                 </span>
+                <span className="font-semibold text-white truncate">{alert.title}</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-400">
                 <span className="truncate">{alert.subtitle}</span>
+                <span className="text-slate-600">·</span>
+                <span className={`font-medium ${alert.statusColor}`}>
+                  {alert.status}
+                </span>
                 <span className="text-slate-600">·</span>
                 <span className="flex items-center gap-1 flex-shrink-0">
                   <Clock className="w-3 h-3" />
@@ -115,7 +191,7 @@ export default function AlertSummary({ alerts }: AlertSummaryProps) {
 
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
-                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors
+                className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors
                            ${alert.priority === 1 
                              ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400' 
                              : 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-400'}`}
@@ -124,33 +200,42 @@ export default function AlertSummary({ alerts }: AlertSummaryProps) {
               >
                 <Phone className="w-4 h-4" />
               </button>
-              {alert.type === 'route' && (
-                <div className="w-8 h-8 rounded-lg bg-slate-700/50 hover:bg-slate-700 flex items-center justify-center text-slate-400 transition-colors">
-                  <ChevronRight className="w-4 h-4" />
-                </div>
-              )}
+              <div className="w-9 h-9 rounded-lg bg-slate-700/50 group-hover:bg-slate-700 flex items-center justify-center text-slate-400 group-hover:text-white transition-colors">
+                <ChevronRight className="w-4 h-4" />
+              </div>
             </div>
           </div>
         ))}
+
+        {filteredAlerts.length === 0 && (
+          <div className="text-center py-8 text-slate-500">
+            <AlertTriangle className="w-10 h-10 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">当前类型无告警</p>
+          </div>
+        )}
       </div>
 
       <div className="mt-4 pt-3 border-t border-slate-700/50">
         <div className="flex items-center justify-between text-xs">
           <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1 text-slate-400">
+            <span className="flex items-center gap-1 text-red-400">
               <span className="w-2 h-2 rounded-full bg-red-500" />
-              异常车辆 {abnormalRouteCount}
+              紧急 {urgentCount}
+            </span>
+            <span className="flex items-center gap-1 text-slate-400">
+              <span className="w-2 h-2 rounded-full bg-blue-500" />
+              线路告警 {routeAlertCount}
             </span>
             <span className="flex items-center gap-1 text-slate-400">
               <span className="w-2 h-2 rounded-full bg-orange-500" />
-              延迟车辆 {delayedRouteCount}
+              学生异常 {studentAlertCount}
             </span>
             <span className="flex items-center gap-1 text-slate-400">
-              <span className="w-2 h-2 rounded-full bg-yellow-500" />
-              待处理学生 {pendingStudentCount}
+              <span className="w-2 h-2 rounded-full bg-red-400" />
+              待清查 {cabinAlertCount}
             </span>
           </div>
-          <span className="text-slate-500">点击线路卡片查看详情</span>
+          <span className="text-slate-500">点击跳转至对应位置</span>
         </div>
       </div>
     </section>

@@ -10,12 +10,18 @@ import {
   MessageSquare,
   CheckCircle2,
   History,
+  Timer,
 } from 'lucide-react';
 import type { Student, FollowUpStatus } from '../types';
 import {
   abnormalTypeLabels,
 } from '../data/mockData';
-import { followUpStatusLabels, followUpStatusColors } from '../types';
+import {
+  followUpStatusLabels,
+  followUpStatusColors,
+  operatorRoleLabels,
+  operatorRoleColors,
+} from '../types';
 
 interface StudentItemProps {
   student: Student;
@@ -156,12 +162,43 @@ export default function StudentItem({ student, index, onUpdateStatus }: StudentI
               </div>
             </div>
 
-            {student.followUpNote && (
-              <div className="flex items-start gap-2">
-                <History className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <div className="text-xs text-slate-500 mb-1">跟进记录</div>
-                  <div className="text-sm text-slate-300">{student.followUpNote}</div>
+            {student.followUpRecords.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Timer className="w-4 h-4 text-slate-500" />
+                  <span className="text-xs text-slate-500 font-medium">跟进时间线</span>
+                </div>
+                <div className="relative pl-6 space-y-3">
+                  <div className="absolute left-1.5 top-1 bottom-1 w-0.5 bg-slate-700/50" />
+                  {student.followUpRecords.map((record, idx) => (
+                    <div key={record.id} className="relative">
+                      <div className={`absolute -left-6 top-0.5 w-3 h-3 rounded-full border-2 border-dark-800 ${
+                        record.status === 'confirmed' ? 'bg-green-500' :
+                        record.status === 'contacted' ? 'bg-blue-500' :
+                        record.status === 'waiting' ? 'bg-orange-500' : 'bg-slate-500'
+                      }`} />
+                      <div className="bg-dark-900/50 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs px-2 py-0.5 rounded border ${followUpStatusColors[record.status]}`}>
+                              {followUpStatusLabels[record.status]}
+                            </span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${operatorRoleColors[record.operatorRole]}`}>
+                              {operatorRoleLabels[record.operatorRole]}
+                            </span>
+                          </div>
+                          <span className="text-xs text-slate-500 font-mono">
+                            {record.time}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          <span className="text-slate-300 font-medium">{record.operator}</span>
+                          <span className="mx-1 text-slate-600">·</span>
+                          {record.note}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

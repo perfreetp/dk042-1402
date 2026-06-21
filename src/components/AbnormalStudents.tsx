@@ -1,20 +1,23 @@
-import { AlertTriangle, Filter, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, Filter, CheckCircle2, X } from 'lucide-react';
 import { useState } from 'react';
 import StudentItem from './StudentItem';
 import type { Student, AbnormalType, FollowUpStatus } from '../types';
 import { followUpStatusLabels } from '../types';
-
-interface AbnormalStudentsProps {
-  students: Student[];
-  onUpdateStatus: (id: string, status: FollowUpStatus, note: string) => void;
-}
+import { useDashboardStore } from '../store/dashboardStore';
 
 type TabType = 'pending' | 'processed';
 type FilterType = 'all' | AbnormalType;
+type StatusFilterType = 'all' | FollowUpStatus;
 
-export default function AbnormalStudents({ students, onUpdateStatus }: AbnormalStudentsProps) {
+export default function AbnormalStudents() {
   const [activeTab, setActiveTab] = useState<TabType>('pending');
   const [filter, setFilter] = useState<FilterType>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilterType>('all');
+  const [routeFilter, setRouteFilter] = useState<string>('all');
+
+  const students = useDashboardStore((state) => state.students);
+  const routes = useDashboardStore((state) => state.routes);
+  const updateStudentFollowUp = useDashboardStore((state) => state.updateStudentFollowUp);
 
   const pendingStudents = students.filter((s) => s.followUpStatus !== 'confirmed');
   const processedStudents = students.filter((s) => s.followUpStatus === 'confirmed');
@@ -22,19 +25,46 @@ export default function AbnormalStudents({ students, onUpdateStatus }: AbnormalS
   const displayStudents = activeTab === 'pending' ? pendingStudents : processedStudents;
 
   const filteredStudents = displayStudents.filter((s) => {
-    if (filter === 'all') return true;
-    return s.abnormalType === filter;
+    if (filter !== 'all' && s.abnormalType !== filter) return false;
+    if (statusFilter !== 'all' && s.followUpStatus !== statusFilter) return false;
+    if (routeFilter !== 'all' && s.routeId !== routeFilter) return false;
+    return true;
   });
 
   const urgentCount = pendingStudents.filter((s) => s.priority === 1).length;
   const newCount = pendingStudents.filter((s) => s.isNew).length;
 
-  const filters: { key: FilterType; label: string }[] = [
-    { key: 'all', label: `全部 (${filteredStudents.length})` },
-    { key: 'absent', label: `未到 (${filteredStudents.filter(s => s.abnormalType === 'absent').length})` },
-    { key: 'wrong_station', label: `错站 (${filteredStudents.filter(s => s.abnormalType === 'wrong_station').length})` },
-    { key: 'parent_pickup', label: `家长接走 (${filteredStudents.filter(s => s.abnormalType === 'parent_pickup').length})` },
+  const typeFilters: { key: FilterType; label: string }[] = [
+    { key: 'all', label: `全部 (${displayStudents.length})` },
+    { key: 'absent', label: `未到 (${displayStudents.filter(s => s.abnormalType === 'absent').length})` },
+    { key: 'wrong_station', label: `错站 (${displayStudents.filter(s => s.abnormalType === 'wrong_station').length})` },
+    { key: 'parent_pickup', label: `家长接走 (${displayStudents.filter(s => s.abnormalType === 'parent_pickup').length})` },
   ];
+
+  const statusFilters: { key: StatusFilterType; label: string }[] = [
+    { key: 'all', label: '全部状态' },
+    { key: 'pending', label: '待处理' },
+    { key: 'contacted', label: '已联系' },
+    { key: 'waiting', label: '等回复' },
+    { key: 'confirmed', label: '已确认' },
+  ];
+
+  const routeFilters = [
+    { key: 'all', label: '全部线路' },
+    ...routes.map((r) => ({ key: r.id, label: r.name })),
+  ];
+
+  const activeFilterCount = [
+    filter !== 'all',
+    statusFilter !== 'all',
+    routeFilter !== 'all',
+  ].filter(Boolean).length;
+
+  const clearAllFilters = () => {
+    setFilter('all');
+    setStatusFilter('all');
+    setRouteFilter('all');
+  };
 
   const tabs: { key: TabType; label: string; count: number; icon: React.ReactNode }[] = [
     { 
@@ -96,22 +126,73 @@ export default function AbnormalStudents({ students, onUpdateStatus }: AbnormalS
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mb-4">
-        <Filter className="w-4 h-4 text-slate-500" />
-        <div className="flex bg-dark-900/50 rounded-lg p-1 flex-wrap gap-1">
-          {filters.map((f) => (
+      <div className="space-y-2 mb-4">
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-slate-500 flex-shrink-0" />
+          <div className="flex-1 flex bg-dark-900/50 rounded-lg p-1 flex-wrap gap-1">
+            {typeFilters.map((f) => (
+              <button
+                key={f.key}
+                className={`text-xs px-3 py-1.5 rounded-md transition-colors ${
+                  filter === f.key
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                }`}
+                onClick={() => setFilter(f.key)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          {activeFilterCount > 0 && (
             <button
-              key={f.key}
-              className={`text-xs px-3 py-1.5 rounded-md transition-colors ${
-                filter === f.key
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-              }`}
-              onClick={() => setFilter(f.key)}
+              className="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1 px-2 py-1"
+              onClick={clearAllFilters}
             >
-              {f.label}
+              <X className="w-3 h-3" />
+              清除筛选
             </button>
-          ))}
+          )}
+        </div>
+
+        {activeTab === 'processed' && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-slate-500 w-16">按状态：</span>
+            <div className="flex bg-dark-900/50 rounded-lg p-1 flex-wrap gap-1 flex-1">
+              {statusFilters.map((f) => (
+                <button
+                  key={f.key}
+                  className={`text-xs px-3 py-1 rounded-md transition-colors ${
+                    statusFilter === f.key
+                      ? 'bg-purple-600 text-white'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                  }`}
+                  onClick={() => setStatusFilter(f.key)}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-slate-500 w-16">按线路：</span>
+          <div className="flex bg-dark-900/50 rounded-lg p-1 flex-wrap gap-1 flex-1 max-h-16 overflow-y-auto">
+            {routeFilters.map((f) => (
+              <button
+                key={f.key}
+                className={`text-xs px-3 py-1 rounded-md transition-colors whitespace-nowrap ${
+                  routeFilter === f.key
+                    ? 'bg-green-600 text-white'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                }`}
+                onClick={() => setRouteFilter(f.key)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -130,7 +211,7 @@ export default function AbnormalStudents({ students, onUpdateStatus }: AbnormalS
                 key={student.id}
                 student={student}
                 index={index}
-                onUpdateStatus={onUpdateStatus}
+                onUpdateStatus={updateStudentFollowUp}
               />
             ))
         ) : (

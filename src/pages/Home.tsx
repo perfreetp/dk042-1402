@@ -1,140 +1,34 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Header from '../components/Header';
 import RouteOverview from '../components/RouteOverview';
 import AbnormalStudents from '../components/AbnormalStudents';
 import ShiftArchive from '../components/ShiftArchive';
 import AlertSummary from '../components/AlertSummary';
-import { initialRoutes, initialStudents, initialShifts, dutyOfficer } from '../data/mockData';
-import type { Route, Student, Shift, AlertItem } from '../types';
+import { useDashboardStore } from '../store/dashboardStore';
 
 export default function Home() {
-  const [routes, setRoutes] = useState<Route[]>(initialRoutes);
-  const [students, setStudents] = useState<Student[]>(initialStudents);
-  const [shifts, setShifts] = useState<Shift[]>(initialShifts);
+  const routes = useDashboardStore((state) => state.routes);
+  const students = useDashboardStore((state) => state.students);
+  const getAlerts = useDashboardStore((state) => state.getAlerts);
+  const simulateDataUpdate = useDashboardStore((state) => state.simulateDataUpdate);
+
   const [updateCount, setUpdateCount] = useState(0);
 
-  const alerts = useMemo<AlertItem[]>(() => {
-    const result: AlertItem[] = [];
-    const statusLabels = { normal: '正常', delayed: '延迟', abnormal: '异常' };
-    const abnormalTypeLabels = { absent: '未到', wrong_station: '错站', parent_pickup: '家长接走' };
-
-    routes.forEach((route) => {
-      if (route.status === 'abnormal') {
-        result.push({
-          id: `route-${route.id}`,
-          type: 'route',
-          priority: 1,
-          title: route.name,
-          subtitle: `${route.driver} / ${route.caretaker}`,
-          status: statusLabels[route.status],
-          statusColor: 'text-red-400',
-          contactName: route.caretaker,
-          contactPhone: route.caretakerPhone,
-          routeId: route.id,
-          reportTime: route.lastUpdate,
-        });
-      } else if (route.status === 'delayed') {
-        result.push({
-          id: `route-${route.id}`,
-          type: 'route',
-          priority: 2,
-          title: route.name,
-          subtitle: `${route.driver} / ${route.caretaker}`,
-          status: statusLabels[route.status],
-          statusColor: 'text-orange-400',
-          contactName: route.caretaker,
-          contactPhone: route.caretakerPhone,
-          routeId: route.id,
-          reportTime: route.lastUpdate,
-        });
-      }
-    });
-
-    students.forEach((student) => {
-      if (student.followUpStatus !== 'confirmed') {
-        result.push({
-          id: `student-${student.id}`,
-          type: 'student',
-          priority: student.priority,
-          title: student.name,
-          subtitle: `${student.className} · ${student.station}`,
-          status: abnormalTypeLabels[student.abnormalType],
-          statusColor: student.priority === 1 ? 'text-red-400' : 'text-orange-400',
-          contactName: student.contactPerson,
-          contactPhone: student.contactPhone,
-          routeId: student.routeId,
-          studentId: student.id,
-          reportTime: student.reportTime,
-        });
-      }
-    });
-
-    return result.sort((a, b) => {
-      if (a.priority !== b.priority) return a.priority - b.priority;
-      return b.reportTime.localeCompare(a.reportTime);
-    });
-  }, [routes, students]);
+  const alerts = getAlerts();
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('zh-CN', { hour12: false });
   };
 
-  const simulateDataUpdate = useCallback(() => {
-    setRoutes((prevRoutes) => {
-      return prevRoutes.map((route) => {
-        if (route.unconfirmedCount > 0 && Math.random() > 0.6) {
-          const newBoarded = route.boardedCount + 1;
-          const newUnconfirmed = route.unconfirmedCount - 1;
-          let newStatus = route.status;
-
-          if (newUnconfirmed === 0 && route.status !== 'abnormal') {
-            newStatus = 'normal';
-          }
-
-          return {
-            ...route,
-            boardedCount: newBoarded,
-            unconfirmedCount: newUnconfirmed,
-            status: newStatus,
-            lastUpdate: formatTime(new Date()),
-          };
-        }
-
-        if (Math.random() > 0.9 && route.status !== 'abnormal') {
-          return {
-            ...route,
-            status: 'delayed',
-            lastUpdate: formatTime(new Date()),
-          };
-        }
-
-        return route;
-      });
-    });
-
+  const handleSimulate = useCallback(() => {
+    simulateDataUpdate();
     setUpdateCount((c) => c + 1);
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(simulateDataUpdate, 10000);
-    return () => clearInterval(timer);
   }, [simulateDataUpdate]);
 
-  const handleUpdateStudentStatus = (studentId: string, status: 'contacted' | 'waiting' | 'confirmed', note: string) => {
-    setStudents((prev) =>
-      prev.map((s) =>
-        s.id === studentId
-          ? {
-              ...s,
-              followUpStatus: status,
-              followUpNote: note,
-              followUpTime: formatTime(new Date()),
-              isNew: false,
-            }
-          : s
-      )
-    );
-  };
+  useEffect(() => {
+    const timer = setInterval(handleSimulate, 10000);
+    return () => clearInterval(timer);
+  }, [handleSimulate]);
 
   const stats = {
     totalRoutes: routes.length,
@@ -142,7 +36,7 @@ export default function Home() {
     completedRoutes: routes.filter((r) => r.unconfirmedCount === 0).length,
     abnormalCount: students.filter((s) => s.followUpStatus !== 'confirmed').length,
     urgentCount: students.filter((s) => s.priority === 1 && s.followUpStatus !== 'confirmed').length,
-    dutyOfficer: dutyOfficer,
+    dutyOfficer: '王主任（值班校领导）',
   };
 
   return (
@@ -162,8 +56,8 @@ export default function Home() {
           </div>
 
           <div className="space-y-6">
-            <AbnormalStudents students={students} onUpdateStatus={handleUpdateStudentStatus} />
-            <ShiftArchive shifts={shifts} />
+            <AbnormalStudents />
+            <ShiftArchive />
           </div>
         </div>
 

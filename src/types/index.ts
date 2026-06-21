@@ -3,6 +3,7 @@ export type AbnormalType = 'absent' | 'wrong_station' | 'parent_pickup';
 export type ShiftType = 'morning' | 'afternoon';
 export type FollowUpStatus = 'pending' | 'contacted' | 'waiting' | 'confirmed';
 export type StudentStatus = 'boarded' | 'unconfirmed' | 'abnormal';
+export type AlertType = 'route' | 'student' | 'cabin_check';
 
 export interface Route {
   id: string;
@@ -18,6 +19,15 @@ export interface Route {
   currentLocation: string;
   caretakerPhone: string;
   driverPhone: string;
+}
+
+export interface FollowUpRecord {
+  id: string;
+  status: FollowUpStatus;
+  operator: string;
+  operatorRole: 'duty_officer' | 'caretaker' | 'teacher';
+  note: string;
+  time: string;
 }
 
 export interface Student {
@@ -36,6 +46,7 @@ export interface Student {
   followUpStatus: FollowUpStatus;
   followUpNote: string;
   followUpTime: string;
+  followUpRecords: FollowUpRecord[];
   status: StudentStatus;
 }
 
@@ -68,7 +79,7 @@ export interface DashboardStats {
 
 export interface AlertItem {
   id: string;
-  type: 'route' | 'student';
+  type: AlertType;
   priority: 1 | 2;
   title: string;
   subtitle: string;
@@ -78,7 +89,11 @@ export interface AlertItem {
   contactPhone: string;
   routeId?: string;
   studentId?: string;
+  shiftId?: string;
   reportTime: string;
+  actionLabel?: string;
+  targetRoute?: string;
+  targetStudent?: string;
 }
 
 export interface StudentDetail {
@@ -118,4 +133,16 @@ export const studentStatusColors: Record<StudentStatus, string> = {
   boarded: 'bg-green-500/20 text-green-400 border-green-500/30',
   unconfirmed: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
   abnormal: 'bg-red-500/20 text-red-400 border-red-500/30',
+};
+
+export const operatorRoleLabels: Record<string, string> = {
+  duty_officer: '值班老师',
+  caretaker: '照管员',
+  teacher: '班主任',
+};
+
+export const operatorRoleColors: Record<string, string> = {
+  duty_officer: 'bg-blue-500/20 text-blue-400',
+  caretaker: 'bg-purple-500/20 text-purple-400',
+  teacher: 'bg-green-500/20 text-green-400',
 };

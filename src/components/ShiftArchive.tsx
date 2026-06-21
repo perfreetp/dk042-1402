@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Archive,
   CheckCircle2,
@@ -11,42 +12,42 @@ import {
   Bus,
   Phone,
   Calendar,
+  ExternalLink,
 } from 'lucide-react';
 import type { Shift } from '../types';
 import { shiftTypeLabels, getTodayDateString } from '../data/mockData';
+import { useDashboardStore } from '../store/dashboardStore';
 
-interface ShiftArchiveProps {
-  shifts: Shift[];
-}
-
-export default function ShiftArchive({ shifts }: ShiftArchiveProps) {
+export default function ShiftArchive() {
+  const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'today' | 'history'>('today');
 
   const today = getTodayDateString();
+  const shifts = useDashboardStore((state) => state.shifts);
+  const routes = useDashboardStore((state) => state.routes);
+  const getTodayMorningShifts = useDashboardStore((state) => state.getTodayMorningShifts);
 
-  const todayShifts = shifts.filter((s) => s.date === today && s.shiftType === 'morning');
+  const todayShifts = getTodayMorningShifts();
   const historyShifts = shifts.filter((s) => s.date !== today || s.shiftType !== 'morning');
-
-  const sortedTodayShifts = [...todayShifts].sort((a, b) => {
-    const aIncomplete = !a.alightingCheck || !a.cabinCheck ? 1 : 0;
-    const bIncomplete = !b.alightingCheck || !b.cabinCheck ? 1 : 0;
-    if (aIncomplete !== bIncomplete) return aIncomplete - bIncomplete;
-    return a.routeName.localeCompare(b.routeName);
-  });
 
   const sortedHistoryShifts = [...historyShifts].sort((a, b) => {
     if (a.date !== b.date) return b.date.localeCompare(a.date);
     return b.completedTime.localeCompare(a.completedTime);
   });
 
-  const displayShifts = viewMode === 'today' ? sortedTodayShifts : sortedHistoryShifts;
+  const displayShifts = viewMode === 'today' ? todayShifts : sortedHistoryShifts;
 
-  const incompleteCount = sortedTodayShifts.filter(
+  const incompleteCount = todayShifts.filter(
     (s) => !s.alightingCheck || !s.cabinCheck
   ).length;
 
-  const cabinIncompleteCount = sortedTodayShifts.filter((s) => !s.cabinCheck).length;
+  const cabinIncompleteCount = todayShifts.filter((s) => !s.cabinCheck).length;
+
+  const getRoutePhone = (routeId: string) => {
+    const route = routes.find((r) => r.id === routeId);
+    return route?.caretakerPhone || '';
+  };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -139,18 +140,18 @@ export default function ShiftArchive({ shifts }: ShiftArchiveProps) {
         <div className="mb-4 p-3 bg-gradient-to-r from-dark-900/60 to-dark-900/30 rounded-xl border border-slate-700/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-green-500" />
-                <span className="text-xs text-slate-400">
-                  已完成 {sortedTodayShifts.filter(s => s.alightingCheck && s.cabinCheck).length}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-yellow-500 animate-pulse" />
-                <span className="text-xs text-slate-400">
-                  运行中 {sortedTodayShifts.filter(s => !s.completedTime).length}
-                </span>
-              </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                  <span className="text-xs text-slate-400">
+                    已完成 {todayShifts.filter(s => s.alightingCheck && s.cabinCheck).length}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500 animate-pulse" />
+                  <span className="text-xs text-slate-400">
+                    运行中 {todayShifts.filter(s => !s.completedTime).length}
+                  </span>
+                </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
                 <span className="text-xs text-slate-400">
@@ -343,7 +344,7 @@ export default function ShiftArchive({ shifts }: ShiftArchiveProps) {
                             </div>
                             <button
                               className="w-8 h-8 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 flex items-center justify-center text-blue-400 transition-colors"
-                              onClick={(e) => handleCall('138-1111-0001', e)}
+                              onClick={(e) => handleCall(getRoutePhone(shift.routeId), e)}
                               title="联系照管员"
                             >
                               <Phone className="w-4 h-4" />
@@ -352,15 +353,28 @@ export default function ShiftArchive({ shifts }: ShiftArchiveProps) {
                         </div>
                       </div>
 
+                      <div className="mt-4 flex items-center gap-2">
+                        <button
+                          className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/route/${shift.routeId}`);
+                          }}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          查看线路详情
+                        </button>
+                      </div>
+
                       {!isAllChecked && shift.completedTime && (
-                        <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                        <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
                           <div className="flex items-start gap-2">
-                            <AlertTriangle className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0 animate-pulse" />
+                            <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0 animate-pulse" />
                             <div>
-                              <div className="text-sm font-medium text-yellow-400">
+                              <div className="text-sm font-medium text-red-400">
                                 ⚠️ 紧急提醒：车辆清查未完成
                               </div>
-                              <div className="text-xs text-yellow-400/80 mt-1">
+                              <div className="text-xs text-red-400/80 mt-1">
                                 请立即联系照管员
                                 {!shift.alightingCheck && '确认下车点名'}
                                 {!shift.alightingCheck && !shift.cabinCheck && '、'}
